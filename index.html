@@ -3192,69 +3192,80 @@ function renderCleaningTimeline() {
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
   import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyD-LUKywAdaQ2Ppj7uAeaxT525OOzfql28",
-  authDomain: "kraton-765fe.firebaseapp.com",
-  projectId: "kraton-765fe",
-  storageBucket: ""kraton-765fe.firebasestorage.app"",
-  messagingSenderId: "462291361996",
-  appId: "1:462291361996:web:4d223e108a73585ed4a269",
-  measurementId: "G-S09XFXG1JK"
-};
+  // Firebase config for kraton-765fe
+  const firebaseConfig = {
+    apiKey: "AIzaSyD-LUKywAdaQ2Ppj7uAeaxT525OOzfql28",
+    authDomain: "kraton-765fe.firebaseapp.com",
+    projectId: "kraton-765fe",
+    storageBucket: "kraton-765fe.appspot.com",
+    messagingSenderId: "462291361996",
+    appId: "1:462291361996:web:4d223e108a73585ed4a269",
+    measurementId: "G-S09XFXG1JK"
+  };
 
+  // Init
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // Anonymous sign-in
   await signInAnonymously(auth);
 
+  // Firestore doc for shared state
   const stateRef = doc(db, "app", "state");
 
+  // LocalStorage keys used by the app
   const STORAGE_KEY = "accommodation_bookings_v1";
   const ACCOM_NAMES_KEY = "accommodation_names_v1";
 
-  async function pushStateToCloud() { 
-    try { 
+  // Push current local state to cloud
+  async function pushStateToCloud() {
+    try {
       const bookingsRaw = localStorage.getItem(STORAGE_KEY);
       const accomRaw = localStorage.getItem(ACCOM_NAMES_KEY);
       const bookings = bookingsRaw ? JSON.parse(bookingsRaw) : [];
       const accommodations = accomRaw ? JSON.parse(accomRaw) : [];
       await setDoc(stateRef, { bookings, accommodations, updatedAt: serverTimestamp() }, { merge: true });
-    } catch(e) { console.warn("Cloud sync failed:", e); }
+    } catch (e) { console.warn("Cloud sync failed:", e); }
   }
 
-  onSnapshot(stateRef, (snap) => { 
-    const data = snap.data(); if (!data) return;
-    try { 
+  // Cloud → local (realtime)
+  onSnapshot(stateRef, (snap) => {
+    const data = snap.data();
+    if (!data) return;
+    try {
       const newB = JSON.stringify(data.bookings || []);
       const newA = JSON.stringify(data.accommodations || []);
       let changed = false;
-      if (localStorage.getItem(STORAGE_KEY) !== newB) { localStorage.setItem(STORAGE_KEY, newB); changed = true; }
-      if (localStorage.getItem(ACCOM_NAMES_KEY) !== newA) { localStorage.setItem(ACCOM_NAMES_KEY, newA); changed = true; }
+      if (localStorage.getItem(STORAGE_KEY) != newB) { localStorage.setItem(STORAGE_KEY, newB); changed = true; }
+      if (localStorage.getItem(ACCOM_NAMES_KEY) != newA) { localStorage.setItem(ACCOM_NAMES_KEY, newA); changed = true; }
       if (changed) {
         try { renderLegend && renderLegend(); } catch(e){}
         try { renderTimeline && renderTimeline(); } catch(e){}
         try { renderDashboard && renderDashboard(); } catch(e){}
         try { renderArrivalsPanel && renderArrivalsPanel(); } catch(e){}
       }
-    } catch(e) { console.warn("Apply cloud state failed:", e); }
+    } catch (e) { console.warn("Apply cloud state failed:", e); }
   });
 
-  (function() { 
+  // Hook save functions to also sync
+  (function(){
     const origSaveBookings = window.saveBookings;
-    window.saveBookings = function(bookings) { 
-      try { origSaveBookings && origSaveBookings(bookings); } catch(e) {} 
-      pushStateToCloud(); 
+    window.saveBookings = function(bookings){
+      try { if (origSaveBookings) origSaveBookings(bookings); } catch(e){}
+      pushStateToCloud();
     };
     const origSaveAccommodations = window.saveAccommodations;
-    window.saveAccommodations = function() {
-      try { origSaveAccommodations && origSaveAccommodations(); } catch(e) {} 
-      pushStateToCloud(); 
+    window.saveAccommodations = function(){
+      try { if (origSaveAccommodations) origSaveAccommodations(); } catch(e){}
+      pushStateToCloud();
     };
-    (async () => { 
+    // First run: initialize state
+    (async ()=>{
       const s = await getDoc(stateRef);
-      if (!s.exists()) { await pushStateToCloud(); }
-      else { 
+      if (!s.exists()) {
+        await pushStateToCloud();
+      } else {
         const data = s.data() || {};
         if (data.bookings) localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookings));
         if (data.accommodations) localStorage.setItem(ACCOM_NAMES_KEY, JSON.stringify(data.accommodations));
