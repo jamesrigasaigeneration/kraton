@@ -1,5 +1,0 @@
-const CACHE_NAME="seashell-cache-v3";
-const ASSETS=["./","./index.html","./manifest.json"];
-self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)))});
-self.addEventListener("activate",e=>{e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.map(k=>k!==CACHE_NAME?caches.delete(k):null));self.clients.claim()})())});
-self.addEventListener("fetch",e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})
