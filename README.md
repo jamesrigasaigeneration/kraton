@@ -1,1 +1,0 @@
-Upload index.html to your repo root. Ensure Anonymous Auth is enabled. Firestore doc: app/state.
